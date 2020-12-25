@@ -1,0 +1,30 @@
+version: "3.8"
+services:
+  api:
+    build:
+      context: .
+      args:
+        ENVIRONMENT: dev
+    volumes:
+    - .:/app
+    ports:
+    - "8000:8000"
+    environment:
+      DB_HOST: postgres
+      DB_USER: yaaccu
+      DB_NAME: yaaccu
+      DB_PASSWORD: securepassword
+      TEST_DB_HOST: test-postgres
+  postgres:
+    image: library/postgres:13.1
+    restart: always
+    environment:
+      POSTGRES_USER: yaaccu
+      POSTGRES_DB: yaaccu
+      POSTGRES_PASSWORD: securepassword
+  test-postgres:
+    image: library/postgres:13.1
+    environment:
+      POSTGRES_USER: yaaccu
+      POSTGRES_DB: yaaccu_test
+      POSTGRES_PASSWORD: securepassword
