@@ -5,6 +5,19 @@ on: push
 jobs:
   pytest:
     runs-on: ubuntu-latest
+    services:
+      test-postgres:
+        image: library/postgres:13.1
+        env:
+          POSTGRES_USER: yaaccu
+          POSTGRES_DB: yaaccu_test
+          POSTGRES_PASSWORD: securepassword
+    env:
+      DB_HOST: postgres
+      DB_USER: yaaccu
+      DB_NAME: yaaccu
+      DB_PASSWORD: securepassword
+      TEST_DB_HOST: test-postgres
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python
