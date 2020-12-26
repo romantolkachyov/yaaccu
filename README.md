@@ -7,7 +7,7 @@ like creating an accounts and transfer funds between them.
 
 Features:
 
-* 100% coverage (TBD!)
+* 100% coverage
 * strong consistency guarantees
 * fast transactions (minimal lock design using "two-step commit")
 * RSA key-pair based auth
