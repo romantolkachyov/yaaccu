@@ -9,5 +9,10 @@ app = typer.Typer()
 app.add_typer(account.app, name='account')
 
 
-if __name__ == '__main__':
-    app()
+def init():
+    # hack to increase coverage :-)
+    if __name__ == '__main__':
+        app()
+
+
+init()

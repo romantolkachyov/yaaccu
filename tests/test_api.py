@@ -1,3 +1,4 @@
+import asyncio
 import time
 from functools import wraps
 
@@ -17,8 +18,8 @@ test_key2 = RSA.generate(1024)
 @pytest.fixture()
 def create_account(client):
     @wraps(create_account)
-    async def _factory(key):
-        timestamp = int(time.time())
+    async def _factory(key, t=None):
+        timestamp = t if t is not None else int(time.time())
         pub_key = key.publickey().export_key().decode()
         # noinspection PyTypeChecker
         sign = pss.new(key).sign(
@@ -43,15 +44,16 @@ def create_account(client):
 @pytest.fixture()
 def make_transfer(client):
     @wraps(make_transfer)
-    async def _make_transfer(sender_key, to_account, amount, currency):
+    async def _make_transfer(sender_key, to_account, amount, currency, ignore_failed=False):
         response = await client.post("/transfer/", json={
             'receiver': to_account,
             'currency': currency.symbol,
-            'amount': '1.00'
+            'amount': amount
         }, headers={
             'X-Token': create_token(sender_key).decode()
         })
-        assert response.status_code == 200, "Invalid status code %s" % response.content
+        if not ignore_failed:
+            assert response.status_code == 200, "Invalid status code %s" % response.content
         return response
     return _make_transfer
 
@@ -60,6 +62,34 @@ def make_transfer(client):
 async def test_home(client):
     response = await client.get("/")
     assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_balance(client, create_account, make_transfer, currency):
+    acc1 = await create_account(test_key)
+
+    # check initial account balance
+    response = await client.get('/balance', headers={
+        'X-Token': create_token(test_key).decode()
+    })
+    assert response.status_code == 200
+    assert response.json()['balance'] == 0
+
+    # fill acc1
+    await Account.create(
+        address='deposit',
+        pub_key=test_deposit_key.publickey().export_key().decode(),
+        type=AccountType.passive
+    )
+    response = await make_transfer(test_deposit_key, acc1, '1.00', currency)
+    assert response.status_code == 200
+
+    # check balance changed after filled
+    response = await client.get('/balance', headers={
+        'X-Token': create_token(test_key).decode()
+    })
+    assert response.status_code == 200
+    assert response.json()['balance'] == 1
 
 
 @pytest.mark.asyncio
@@ -93,6 +123,12 @@ async def test_send_to_unregistered_pub_key(client, currency, create_account):
 @pytest.mark.asyncio
 async def test_create_account(create_account):
     assert await create_account(test_key)
+
+
+@pytest.mark.asyncio
+async def test_create_account_invalid_sign(create_account):
+    with pytest.raises(AssertionError):
+        await create_account(test_key, t=0)  # expired timestamp
 
 
 @pytest.mark.asyncio
@@ -141,6 +177,21 @@ async def test_invalid_token_sign(client, create_account, currency):
 
 
 @pytest.mark.asyncio
+async def test_transfer_invalid_currency(client, create_account):
+    await create_account(test_key)
+    to_account = await create_account(test_key2)
+    response = await client.post("/transfer/", json={
+        'receiver': to_account,
+        'currency': 'INVALID',
+        'amount': '1.00'
+    }, headers={
+        'X-Token': create_token(test_key).decode()
+    })
+    assert response.status_code == 400, "Should fail with invalid currency: %s" % response.content
+    return response
+
+
+@pytest.mark.asyncio
 async def test_success_transfer(make_transfer, create_account, currency):
     """Test success transfer.
 
@@ -162,6 +213,40 @@ async def test_success_transfer(make_transfer, create_account, currency):
 
     response = await make_transfer(test_key, acc2, '1.00', currency)
     assert response.status_code == 200, "Invalid status code %s" % response.content
+
+
+@pytest.mark.asyncio
+async def test_race_condition(make_transfer, create_account, currency, client):
+    # create account
+    # fill account
+    # create N tasks and start them in parallel
+    # TODO: check if last view line covered
+    acc1 = await create_account(test_key)
+    acc2 = await create_account(test_key2)
+
+    await Account.create(
+        address='deposit',
+        pub_key=test_deposit_key.publickey().export_key().decode(),
+        type=AccountType.passive
+    )
+
+    await make_transfer(test_deposit_key, acc1, '1.00', currency)
+
+    await asyncio.gather(*[
+        make_transfer(test_key, acc2, '1.00', currency, ignore_failed=True) for _ in range(10)
+    ])
+
+    response = await client.get('/balance', headers={
+        'X-Token': create_token(test_key).decode()
+    })
+    assert response.status_code == 200, "Wrong status %s" % response.content
+    assert response.json()['balance'] == 0
+
+    response = await client.get('/balance', headers={
+        'X-Token': create_token(test_key2).decode()
+    })
+    assert response.status_code == 200, "Wrong status %s" % response.content
+    assert response.json()['balance'] == 1
 
 
 @pytest.mark.asyncio

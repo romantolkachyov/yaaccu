@@ -2,7 +2,6 @@ import logging
 import time
 from decimal import Decimal
 
-from Cryptodome.PublicKey import RSA
 from fastapi import Depends, APIRouter, HTTPException
 from gino.exceptions import NoResultFound
 from pydantic import BaseModel
@@ -13,7 +12,7 @@ from .models.account import Account
 from .models.currency import Currency
 from .models.document import Document
 from .models.operation import Operation
-from .utils import pub_key_to_account, create_token
+from .utils import pub_key_to_account
 from .signature import check_signature, InvalidSignature
 
 router = APIRouter()
@@ -33,7 +32,7 @@ async def root():
 @router.get('/balance')
 async def account_balance(account=Depends(get_current_account)):
     balance = await db.select([
-        db.func.sum(Operation.amount)
+        db.func.coalesce(db.func.sum(Operation.amount), 0)
     ]).where(Operation.account == account.id).gino.scalar()
     return {
         "account": account.address,
@@ -77,29 +76,6 @@ async def create_account(create_request: CreateAccountRequest):
     }
 
 
-@router.post('/create/insecure/')
-async def insecure_create_account():
-    """Generate key pair and create account (insecure).
-
-    For testing only: helps to create account without generation of RSA pair.
-    It is insecure because the private key transferred in the response body.
-
-    FIXME: should be disabled in prod because key generation is a heavy work for CPU
-    """
-    rnd_key = RSA.generate(1024)
-    pub_key = rnd_key.publickey().export_key().decode()
-    account = await Account.create(
-        address=pub_key_to_account(pub_key),
-        pub_key=pub_key,
-    )
-    return {
-        "account": account.address,
-        "pub_key": pub_key,
-        "private_key": rnd_key.export_key().decode(),
-        "token": create_token(rnd_key)
-    }
-
-
 class TransferInfo(BaseModel):
     receiver: str
     currency: str
@@ -126,13 +102,11 @@ async def transfer(transfer_info: TransferInfo, account=Depends(get_current_acco
         amount=transfer_info.amount,
         currency=currency
     )
-    if doc is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Document is invalid. Try again later if you're pretty sure "
-                   "you meet all preconditions."
-        )
     if doc:
         await doc.commit()
         return doc.to_dict()
-    return {"error": "Transfer failed, try again later"}
+    raise HTTPException(
+        status_code=400,
+        detail="Document is invalid. Try again later if you're pretty sure "
+               "you meet all preconditions."
+    )
