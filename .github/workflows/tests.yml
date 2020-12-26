@@ -12,12 +12,21 @@ jobs:
           POSTGRES_USER: yaaccu
           POSTGRES_DB: yaaccu_test
           POSTGRES_PASSWORD: securepassword
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
     env:
       DB_HOST: postgres
       DB_USER: yaaccu
       DB_NAME: yaaccu
       DB_PASSWORD: securepassword
-      TEST_DB_HOST: test-postgres
+      TEST_DB_HOST: localhost
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python
