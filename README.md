@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/romantolkachyov/yaaccu/branch/master/graph/badge.svg?token=T3GB8PGG4E)](https://codecov.io/gh/romantolkachyov/yaaccu)
+
 # Yet another accounting
 
 Fast-api based service implementing base accounting functionality
