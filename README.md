@@ -11,7 +11,7 @@ Features:
 * strong consistency guarantees
 * fast transactions (minimal lock design using "two-step commit")
 * RSA key-pair based auth
-* account ownership; only the owner of the private key can transfer funds (FIXME)
+* account ownership; only the owner of the private key can transfer funds
 * transaction signing; allowing clients to prove transaction origin and check data integrity (TBD)
 * integrity audit; allowing clients to check data corruption or identify possible attacks on the storage (TBD)
 * accounting rules (TBD)
