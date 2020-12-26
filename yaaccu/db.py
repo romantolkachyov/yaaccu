@@ -1,4 +1,4 @@
-from gino.ext.starlette import Gino
+from gino.ext.starlette import Gino  # noqa  # pylint: disable=no-name-in-module,import-error
 
 import yaaccu.settings as config
 

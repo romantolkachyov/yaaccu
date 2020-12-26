@@ -4,9 +4,8 @@ from decimal import Decimal
 
 from Cryptodome.PublicKey import RSA
 from fastapi import Depends, APIRouter, HTTPException
-from gino import NoResultFound
+from gino.exceptions import NoResultFound
 from pydantic import BaseModel
-from sqlalchemy import func
 
 from .db import db
 from .security import get_current_account
@@ -23,6 +22,7 @@ router = APIRouter()
 CREATE_ACCOUNT_TOKEN_EXPIRE_INTERVAL = 3600
 
 log = logging.getLogger(__name__)
+
 
 @router.get("/")
 async def root():
@@ -56,18 +56,16 @@ class CreateAccountRequest(BaseModel):
 async def create_account(create_request: CreateAccountRequest):
     """Create new account using generate key pair.
 
-    You should provide public key and signature proving your are the owner of the
-    corresponding private key. `sign` must be a valid a PKCS#1 PSS signature for
-    the provided public key.
+    You should provide public key and signature proving your are the owner of the corresponding
+    private key. `sign` must be a valid a PKCS#1 PSS signature for the provided public key.
     """
-    if create_request.timestamp < time.time() - CREATE_ACCOUNT_TOKEN_EXPIRE_INTERVAL:
-        raise HTTPException(status_code=400, detail="Signature expired")
-
     try:
+        if create_request.timestamp < time.time() - CREATE_ACCOUNT_TOKEN_EXPIRE_INTERVAL:
+            raise InvalidSignature()
         content = ''.join([create_request.pub_key, str(create_request.timestamp)])
         check_signature(content, create_request.sign, create_request.pub_key)
-    except InvalidSignature:
-        raise HTTPException(status_code=400, detail="Invalid signature")
+    except InvalidSignature as e:
+        raise HTTPException(status_code=400, detail="Invalid signature") from e
 
     account = await Account.create(
         address=pub_key_to_account(create_request.pub_key),
@@ -114,13 +112,13 @@ async def transfer(transfer_info: TransferInfo, account=Depends(get_current_acco
     """
     try:
         currency = await Currency.query.where(Currency.symbol == transfer_info.currency).gino.one()
-    except NoResultFound:
-        raise HTTPException(status_code=400, detail="Invalid currency")
+    except NoResultFound as e:
+        raise HTTPException(status_code=400, detail="Invalid currency") from e
 
     try:
         receiver = await Account.query.where(Account.address == transfer_info.receiver).gino.one()
-    except NoResultFound:
-        raise HTTPException(status_code=400, detail="Invalid receiver account")
+    except NoResultFound as e:
+        raise HTTPException(status_code=400, detail="Invalid receiver account") from e
 
     doc = await Document.create_transfer(
         sender=account,
@@ -131,7 +129,8 @@ async def transfer(transfer_info: TransferInfo, account=Depends(get_current_acco
     if doc is None:
         raise HTTPException(
             status_code=400,
-            detail="Document is invalid. Try again later if you're pretty sure you meet all preconditions."
+            detail="Document is invalid. Try again later if you're pretty sure "
+                   "you meet all preconditions."
         )
     if doc:
         await doc.commit()

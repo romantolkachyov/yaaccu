@@ -1,3 +1,4 @@
+# pylint: disable=no-member,wrong-import-position
 import sys
 from logging.config import fileConfig
 from pathlib import Path
@@ -21,8 +22,8 @@ fileConfig(config.config_file_name)
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from yaaccu.settings import DB_DSN
-from yaaccu.db import db
+from yaaccu.settings import DB_DSN  # noqa
+from yaaccu.db import db  # noqa
 
 config.set_main_option("sqlalchemy.url", str(DB_DSN))
 target_metadata = db
@@ -33,7 +34,7 @@ target_metadata = db
 # ... etc.
 
 
-def run_migrations_offline():
+def run_migrations_offline():  # pragma: no cover
     """Run migrations in 'offline' mode.
 
     This configures the context with just a URL
@@ -79,7 +80,7 @@ def run_migrations_online():
             context.run_migrations()
 
 
-if context.is_offline_mode():
+if context.is_offline_mode():  # pragma: no cover
     run_migrations_offline()
 else:
     run_migrations_online()

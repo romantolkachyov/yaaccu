@@ -13,7 +13,7 @@ DB_USER = config("DB_USER", default=None)
 DB_PASSWORD = config("DB_PASSWORD", cast=Secret, default=None)
 DB_DATABASE = config("DB_DATABASE", default=None)
 if TESTING:
-    if DB_DATABASE:
+    if DB_DATABASE:  # pragma: no cover
         DB_DATABASE += "_test"
     else:
         DB_DATABASE = "yaaccu_test"

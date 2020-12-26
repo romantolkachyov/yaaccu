@@ -20,10 +20,10 @@ def check_signature(content: str, signature: str, pub_key: str, raise_exception=
         sign = bytes.fromhex(signature)
         verifier = pss.new(RSA.import_key(pub_key))
         # noinspection PyTypeChecker
-        verifier.verify(SHA3_256.new(content.encode()), sign)
-    except (TypeError, ValueError):
+        verifier.verify(SHA3_256.new(content.encode()), sign)  # type: ignore
+    except (TypeError, ValueError) as e:
         if raise_exception:
-            raise InvalidSignature()
+            raise InvalidSignature() from e
         return False
     return True
 
@@ -31,4 +31,4 @@ def check_signature(content: str, signature: str, pub_key: str, raise_exception=
 def create_signature(content: str, private_key: str):
     cipher = pss.new(RSA.import_key(private_key))
     # noinspection PyTypeChecker
-    return cipher.sign(SHA3_256.new(content.encode())).hex()
+    return cipher.sign(SHA3_256.new(content.encode())).hex()  # type: ignore

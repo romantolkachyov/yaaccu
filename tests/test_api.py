@@ -7,8 +7,7 @@ from Cryptodome.Hash import SHA3_256
 from Cryptodome.Signature import pss
 
 from yaaccu.models import Account, AccountType
-from yaaccu.utils import create_token
-
+from yaaccu.utils import create_token, pub_key_to_account
 
 test_deposit_key = RSA.generate(1024)
 test_key = RSA.generate(1024)
@@ -64,8 +63,81 @@ async def test_home(client):
 
 
 @pytest.mark.asyncio
+async def test_unregistered_pub_key(client, currency, create_account):
+    acc2 = await create_account(test_key2)
+
+    response = await client.post("/transfer/", json={
+        'receiver': acc2,
+        'currency': currency.symbol,
+        'amount': '1.00'
+    }, headers={
+        'X-Token': create_token(test_key).decode()
+    })
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_send_to_unregistered_pub_key(client, currency, create_account):
+    await create_account(test_key)
+
+    response = await client.post("/transfer/", json={
+        'receiver': pub_key_to_account(test_key2.publickey().export_key()),
+        'currency': currency.symbol,
+        'amount': '1.00'
+    }, headers={
+        'X-Token': create_token(test_key).decode()
+    })
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_create_account(create_account):
     assert await create_account(test_key)
+
+
+@pytest.mark.asyncio
+async def test_invalid_token(client, create_account, currency):
+    await create_account(test_key)
+    acc2 = await create_account(test_key2)
+
+    response = await client.post("/transfer/", json={
+        'receiver': acc2,
+        'currency': currency.symbol,
+        'amount': '1.00'
+    }, headers={
+        'X-Token': 'INVALID'
+    })
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_expired_token(client, create_account, currency):
+    acc1 = await create_account(test_key)
+    await create_account(test_key2)
+
+    response = await client.post("/transfer/", json={
+        'receiver': acc1,
+        'currency': currency.symbol,
+        'amount': '1.00'
+    }, headers={
+        'X-Token': create_token(test_key2, t=1).decode()
+    })
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_invalid_token_sign(client, create_account, currency):
+    acc1 = await create_account(test_key)
+    await create_account(test_key2)
+
+    response = await client.post("/transfer/", json={
+        'receiver': acc1,
+        'currency': currency.symbol,
+        'amount': '1.00'
+    }, headers={
+        'X-Token': create_token(test_key2, signature='123').decode()
+    })
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio

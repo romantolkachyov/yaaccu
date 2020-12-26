@@ -1,3 +1,10 @@
 pytest
+pytest-cov
 pytest-asyncio
 async_asgi_testclient
+
+pylama
+pylint
+
+mypy
+sqlalchemy-stubs

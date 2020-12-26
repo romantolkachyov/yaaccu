@@ -12,7 +12,6 @@ from .currency import Currency
 from .operation import Operation
 
 log = logging.getLogger('yaaccu')
-log.disabled = property(lambda x: False)
 
 
 class InvalidDocumentException(Exception):
@@ -26,13 +25,51 @@ class Document(db.Model):
     committed = db.Column(db.Boolean(), default=False)
     created_at = db.Column(db.DateTime(), default=datetime.utcnow)
 
+    async def transfer(self,
+                       sender: Account,
+                       receiver: Account,
+                       amount: Decimal,
+                       currency: Currency):
+        """Add a pair of operations representing transfer between two accounts.
+
+        :param sender: sender account
+        :param receiver: receiver account
+        :param amount: transfer amount
+        :param currency: used currency
+        """
+        await Operation.create(
+            document=self.id,
+            account=sender.id,
+            currency=currency.id,
+            amount=-amount
+        )
+        await Operation.create(
+            document=self.id,
+            account=receiver.id,
+            currency=currency.id,
+            amount=amount
+        )
+
+    async def add_operation(self, account: Account, currency: Currency, amount: Decimal):
+        """Add operation to the document.
+
+        Just a shortcut for `Operation.create` without `document` parameter
+        and explict args order.
+        """
+        return await Operation.create(
+            document=self.id,
+            account=account.id,
+            currency=currency.id,
+            amount=amount
+        )
+
     @classmethod
     async def create_transfer(cls,
                               sender: Account,
                               receiver: Account,
                               amount: Decimal,
                               currency: Currency):
-        """Create transfer between two accounts.
+        """Create transfer document between two accounts.
 
         Create new document containing two operations: the first one subtract
         specified amount from the sender account and the other append the same
@@ -41,19 +78,8 @@ class Document(db.Model):
         You must commit returned document manually.
         """
         async with db.transaction() as tx:
-            doc = await cls.create()
-            await Operation.create(
-                document=doc.id,
-                account=sender.id,
-                currency=currency.id,
-                amount=-amount
-            )
-            await Operation.create(
-                document=doc.id,
-                account=receiver.id,
-                currency=currency.id,
-                amount=amount
-            )
+            doc: Document = await cls.create()
+            await doc.transfer(sender, receiver, amount, currency)
             if not await doc.is_valid():
                 tx.raise_rollback()
             return doc
@@ -71,28 +97,29 @@ class Document(db.Model):
     async def is_valid(self):
         """Check if document is valid.
 
-        Checks if the total sum of the document operations is always zero per each used currency.
-        Also, checks if each involved account will not become invalid after the document committed
-        (like active account balance should be always positive and a passive account should be
-        always negative or equal to zero).
+        Checks if the total sum of the document operations is always zero per each used
+        currency. Also, checks if each involved account will not become invalid after
+        the document committed or any (like active account balance should be always
+        positive and a passive account should be always negative or equal to zero).
 
-        You must exit any transactions before invoking this method to be able to see operations
-        created while your connection were isolated.
+        You must exit any transactions before invoking this method to be
+        able to see operations created while your connection were isolated.
 
         Validation performed in two steps:
 
         1. at first time checks performed against all operations in the database (including
-         not committed yet) to ensure we will not introduce conflicts with transactions prepared
-         to commit: there is a possibility that other client performed his document validation before
-         we inserted our one, so we should rollback it that case.
+        not committed yet) to ensure we will not introduce conflicts with transactions
+        prepared to commit: there is a possibility that other client performed his document
+        validation before we inserted our one, so we should rollback it that case.
 
-        2. the second time the same checks performed only on committed operations to ensure some
-         uncommitted transactions from the first step didn't rolled back for some reason so we
-         will not introduce inconsistency
+        2. the second time the same checks performed only on committed operations
+        to ensure some uncommitted transactions from the first step didn't
+        rolled back for some reason so we will not introduce inconsistency
 
-        Other db clients follow the same rules so it is not possible to introduce conflicts between
-        this checks (while our uncommitted document and operations is in the database).
+        Other db clients follow the same rules so it is not possible to introduce conflicts
+        between this checks (while our uncommitted document and operations is in the database).
         """
+
         # TODO: check if we are inside transaction and raise exception
         try:
             log.debug("Perform dirty document check")
@@ -134,19 +161,18 @@ class Document(db.Model):
 
     async def _per_account_balance_is_valid(self, include_dirty=True):
         balance_column = db.func.coalesce(db.func.sum(Operation.amount), 0)
-        # accounts_balances = db.select([
-        #     balance_column,
-        #     Account
-        # ]).where(Operation.account == Account.id)
 
+        from_stmt = Operation.join(Account).join(Document).join(Currency)
         accounts_balances = db.select([
             balance_column,
             Currency.symbol,
             Account
-        ]).select_from(Operation.join(Account).join(Document).join(Currency)).where(Operation.account == Account.id)
+        ]).select_from(from_stmt).where(Operation.account == Account.id)
 
         if not include_dirty:
-            accounts_balances = accounts_balances.where(or_(Document.committed == True, Document.id == self.id))
+            accounts_balances = accounts_balances.where(
+                or_(Document.committed.is_(True), Document.id == self.id)
+            )
 
         accounts_balances = accounts_balances.group_by(Account.id, Currency.symbol)
 

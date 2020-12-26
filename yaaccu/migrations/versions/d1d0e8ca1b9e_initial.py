@@ -1,9 +1,8 @@
 """initial
 
 Revision ID: d1d0e8ca1b9e
-Revises: 
+Revises:
 Create Date: 2020-12-20 20:22:23.924294
-
 """
 from alembic import op
 import sqlalchemy as sa
@@ -17,16 +16,20 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table('accounts',
+    op.create_table(
+        'accounts',
         sa.Column('id', sa.BigInteger(), nullable=False),
         sa.Column('address', sa.Unicode(), nullable=True),
         sa.Column('pub_key', sa.Unicode(), nullable=True),
-        sa.Column('type', sa.Enum('active', 'passive', 'normal', name='account_type'), nullable=True),
+        sa.Column(
+            'type', sa.Enum('active', 'passive', 'normal', name='account_type'), nullable=True
+        ),
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_accounts_address'), 'accounts', ['address'], unique=True)
     op.create_index(op.f('ix_accounts_pub_key'), 'accounts', ['pub_key'], unique=True)
-    op.create_table('currencies',
+    op.create_table(
+        'currencies',
         sa.Column('id', sa.BigInteger(), nullable=False),
         sa.Column('name', sa.Unicode(), nullable=True),
         sa.Column('symbol', sa.Unicode(), nullable=True),
@@ -34,13 +37,15 @@ def upgrade():
         sa.UniqueConstraint('name')
     )
     op.create_index(op.f('ix_currencies_symbol'), 'currencies', ['symbol'], unique=True)
-    op.create_table('documents',
+    op.create_table(
+        'documents',
         sa.Column('id', sa.BigInteger(), nullable=False),
         sa.Column('committed', sa.Boolean(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('operations',
+    op.create_table(
+        'operations',
         sa.Column('id', sa.BigInteger(), nullable=False),
         sa.Column('document', sa.BigInteger(), nullable=True),
         sa.Column('account', sa.BigInteger(), nullable=True),

@@ -1,3 +1,4 @@
+import binascii
 import time
 import logging
 from base64 import b64decode
@@ -19,15 +20,14 @@ def decode_token(token: str):
 
     Check sign, token expiration time and return encoded public key.
     """
-    decoded = b64decode(token.encode())
-
     try:
+        decoded = b64decode(token.encode())
         key_data = orjson.loads(decoded)
         timestamp = int(key_data['t'])
         pub_key = key_data['p']
         signature = key_data['s']
-    except (ValueError, TypeError, KeyError, orjson.JSONDecodeError) as e:
-        logging.debug("Invalid token format: %s", decoded)
+    except (ValueError, TypeError, KeyError, orjson.JSONDecodeError, binascii.Error) as e:
+        logging.debug("Invalid token format: %s", token)
         raise HTTPException(status_code=403, detail="Invalid token") from e
 
     if timestamp > time.time() or timestamp < time.time() - TOKEN_EXPIRE_INTERVAL:
@@ -39,9 +39,9 @@ def decode_token(token: str):
             signature,
             pub_key
         )
-    except InvalidSignature:
+    except InvalidSignature as e:
         logging.error("Invalid token signature. Might be access violation.")
-        raise HTTPException(status_code=403, detail="Invalid token")
+        raise HTTPException(status_code=403, detail="Invalid token") from e
 
     return pub_key
 

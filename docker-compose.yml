@@ -3,8 +3,7 @@ services:
   api:
     build:
       context: .
-      args:
-        ENVIRONMENT: dev
+      target: dev
     volumes:
     - .:/app
     ports:

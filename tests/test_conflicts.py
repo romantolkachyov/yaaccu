@@ -21,9 +21,19 @@ async def test_conflicting_documents_complex(create_account, currency):
 
     # Create first valid document before committing fill_doc
     doc1 = await Document.create()
-    await Operation.create(document=doc1.id, account=acc1.id, currency=currency.id, amount=Decimal('-1.00'))
-    await Operation.create(document=doc1.id, account=acc2.id, currency=currency.id, amount=Decimal('1.00'))
-    assert await doc1.is_valid() is False, "Should be invalid before fill committed"
+    await Operation.create(
+        document=doc1.id,
+        account=acc1.id,
+        currency=currency.id,
+        amount=Decimal('-1.00')
+    )
+    await Operation.create(
+        document=doc1.id,
+        account=acc2.id,
+        currency=currency.id,
+        amount=Decimal('1.00')
+    )
+    assert await doc1.is_valid() is False, "Should be invalid before fill_doc committed"
 
     await fill_doc.commit()
     assert await doc1.is_valid() is True

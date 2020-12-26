@@ -11,15 +11,14 @@ from Cryptodome.Signature import pss
 KEY_SIZE = 1024
 
 
-def create_token(key=None):
-    if key is None:
-        key = RSA.generate(KEY_SIZE)
+def create_token(key=None, t=None, signature=None):
+    key = key or RSA.generate(KEY_SIZE)
     d = {
-        't': int(time.time()),
+        't': t or int(time.time()),
         'p': key.publickey().export_key().decode()
     }
     sign_content = (''.join([d['p'], str(d['t'])])).encode()
-    d['s'] = pss.new(key).sign(SHA3_256.new(sign_content)).hex()
+    d['s'] = signature or pss.new(key).sign(SHA3_256.new(sign_content)).hex()
     return b64encode(orjson.dumps(d))
 
 
