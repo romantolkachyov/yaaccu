@@ -34,7 +34,7 @@ jobs:
           pwd
           ls
           cat alembic.ini
-          pytest --doctest-modules --cov=yaaccu --cov-report=xml
+          pytest --cov=yaaccu --cov-report=xml
       - name: Upload coverage to codecov
         uses: codecov/codecov-action@v1
         with:
