@@ -19,13 +19,13 @@ Features:
 
 ## Why?
 
-1. It is a critical part of the common functionality of the many products
+1. It is a critical part of the common functionality of many products
 2. It is hard to share your accounting package when it becomes amateur (because of p.1)
 3. It is hard to improve it in the production environment (because of p.1)
 4. It is boring stuff, but there is the p.1
 
 So, many products has bad accounting because of these reasons. And, because existing solution doesn't 
-meet requirements.
+fit requirements.
 
 Yaaccu is a simple but powerful service you can use in your infrastructure. It is not a library/package
 because the service form limits your intention to make things complex. Yaaccu is business-agnostic, 
